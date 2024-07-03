@@ -36,13 +36,13 @@ export default class MessageCenterWebPart extends BaseClientSideWebPart<IMessage
     this.loadMessages();
   }
 
-  protected onInit(): Promise<void> {
+  protected async onInit(): Promise<void> {
     return this._getEnvironmentMessage().then(message => {
       this._environmentMessage = message;
     });
   }
 
-  private _getEnvironmentMessage(): Promise<string> {
+  private async _getEnvironmentMessage(): Promise<string> {
     if (!!this.context.sdks.microsoftTeams) { // running in Teams, office.com or Outlook
       return this.context.sdks.microsoftTeams.teamsJs.app.getContext()
         .then(context => {
@@ -70,31 +70,34 @@ export default class MessageCenterWebPart extends BaseClientSideWebPart<IMessage
   }
 
   private loadMessages(): void {
-    const url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Messages')/items?$select=Title,Body,Recipient,RecipientGroup`;
+    const url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Messages')/items?$select=Message Title,Body,Service User,Group`;
 
-    this.context.spHttpClient.get(url, SPHttpClient.configurations.v1)
+    // eslint-disable-next-line no-void
+    void this.context.spHttpClient.get(url, SPHttpClient.configurations.v1)
       .then((response: SPHttpClientResponse) => {
         return response.json();
       })
       .then((data: any) => {
-        this.filterMessages(data.value);
+        this.filterMessages(data.value); 
       });
   }
 
   private filterMessages(messages: any[]): void {
     const currentUserEmail = this.context.pageContext.user.email;
 
-    this.context.msGraphClientFactory.getClient('3')
+    // eslint-disable-next-line no-void
+    void this.context.msGraphClientFactory.getClient('3')
       .then((client: MSGraphClientV3) => {
         const groupPromises: Promise<any>[] = [];
 
         messages.forEach(message => {
-          if (message.RecipientGroup) {
-            groupPromises.push(client.api(`/groups/${message.RecipientGroup}/members`).get());
+          if (message.Group) {
+            groupPromises.push(client.api(`/groups/${message.Group}/members`).get());
           }
         });
 
-        Promise.all(groupPromises).then(groupResults => {
+        // eslint-disable-next-line no-void
+        void Promise.all(groupPromises).then(groupResults => {
           const groupMembers = groupResults.flatMap((result: any) => result.value.map((user: any) => user.mail || user.userPrincipalName));
 
           const filteredMessages = messages.filter(message => {
@@ -117,7 +120,7 @@ export default class MessageCenterWebPart extends BaseClientSideWebPart<IMessage
         messageElement.innerHTML = `
           <div class="${styles.messageTitle}">${escape(message.Title)}</div>
           <div class="${styles.messageBody}">${escape(message.Body)}</div>
-          <div class="${styles.messageRecipient}">To: ${escape(message.Recipient)}${message.RecipientGroup ? `, Group: ${escape(message.RecipientGroup)}` : ''}</div>
+          <div class="${styles.messageRecipient}">To: ${escape(message.Recipient)}${message.Group ? `, Group: ${escape(message.Group)}` : ''}</div>
         `;
         messagesContainer.appendChild(messageElement);
       });
